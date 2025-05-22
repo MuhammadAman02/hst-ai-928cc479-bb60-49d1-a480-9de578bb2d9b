@@ -1,30 +1,37 @@
+"""
+Configuration settings for the application.
+"""
 from pydantic_settings import BaseSettings
-import os
+from pydantic import Field
 from typing import Optional
+import os
+
 
 class Settings(BaseSettings):
-    APP_NAME: str = "My Enterprise App"
-    APP_VERSION: str = "1.0.0"  # Semantic versioning
-    APP_ENV: str = os.getenv("APP_ENV", "development")
-    DEBUG: bool = False
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./default.db")
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "a_very_secret_key")
+    """Application configuration with validation."""
     
-    # Optional API keys and external service configurations
-    openai_api_key: Optional[str] = None
-    langchain_api_key: Optional[str] = None
-    langchain_endpoint: Optional[str] = None
-    langchain_project: Optional[str] = None
-    langchain_tracing_v2: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    github_client_id: Optional[str] = None
-    github_client_secret: Optional[str] = None
-    github_token: Optional[str] = None
-    github_username: Optional[str] = None
+    # Application Settings
+    APP_NAME: str = Field(default="Irish Fraud Detection System", description="Application name")
+    APP_VERSION: str = Field(default="1.0.0", description="Application version")
+    APP_ENV: str = Field(default="development", description="Application environment")
+    DEBUG: bool = Field(default=False, description="Debug mode")
+    LOG_LEVEL: str = Field(default="INFO", description="Logging level")
+    
+    # Security Settings
+    SECRET_KEY: str = Field(..., description="Secret key for JWT token generation")
+    ALGORITHM: str = Field(default="HS256", description="Algorithm for JWT token")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Token expiration time in minutes")
+    
+    # Server Settings
+    HOST: str = Field(default="0.0.0.0", description="Server host")
+    PORT: int = Field(default=8000, description="Server port")
+    FRAMEWORK: str = Field(default="nicegui", description="UI framework to use")
     
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
-        extra = "ignore"  # Ignore extra fields in environment variables
+        case_sensitive = False
 
+
+# Global configuration instance
 settings = Settings()
