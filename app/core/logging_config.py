@@ -1,33 +1,58 @@
+"""
+Logging configuration for the application.
+"""
 import logging
 import sys
-from logging.handlers import RotatingFileHandler
+from loguru import logger
+from .config import settings
 
-# Define log format
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# Create a custom logger
-logger = logging.getLogger("app")
-logger.setLevel(logging.INFO) # Default level, can be overridden by config
+class InterceptHandler(logging.Handler):
+    """
+    Intercept standard logging messages toward Loguru.
+    
+    This handler intercepts all standard logging calls and redirects them to Loguru.
+    """
+    
+    def emit(self, record):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
 
-# Create handlers
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
 
-# File handler (optional, but good for production)
-# Creates a logs directory if it doesn't exist
-import os
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-file_handler = RotatingFileHandler('logs/app.log', maxBytes=1024*1024*5, backupCount=5, encoding='utf-8') # 5MB per file, 5 backup files
-file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
-# Add handlers to the logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
 
-def get_logger(name: str) -> logging.Logger:
-    """Returns a logger instance with the specified name, inheriting base config."""
-    return logging.getLogger(name)
+def setup_logging():
+    """Configure logging for the application."""
+    # Remove default handlers
+    logging.basicConfig(handlers=[InterceptHandler()], level=0)
+    
+    # Set log level based on settings
+    logger.configure(
+        handlers=[
+            {
+                "sink": sys.stdout,
+                "level": settings.LOG_LEVEL,
+                "format": "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+            }
+        ]
+    )
+    
+    # Intercept standard library logging
+    for name in logging.root.manager.loggerDict.keys():
+        logging.getLogger(name).handlers = [InterceptHandler()]
+    
+    return logger
 
-# End of logging configuration
+
+def get_logger(name):
+    """Get a logger instance for the given name."""
+    return logger.bind(name=name)
